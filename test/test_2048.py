@@ -41,15 +41,15 @@ def train(policy, is_train, device='cuda', param_file=None):
     local_policy = globals()[policy_name]
 
     device = torch.device(device)
-    env_fun = lambda: CatchBallEnv(num_balls=0, action_penalty=0.005, waiting=4, is_continuous=is_continuous)
+    env_fun = lambda: CatchBallEnv(num_balls=10, action_penalty=0.005, waiting=0, is_continuous=is_continuous)
     my_test_env = BatchDeviceWrapper(env_fun(), device=device)
 
     config = RLConfig(batch_size=256)
     config.gamma = .99
-    config.capacity = 60000
-    config.buffer = SimpleReplayBuffer
+    config.capacity = 40000
+    config.buffer = PrioritizedReplayBuffer
     config.updates = 100
-    config.learning_rate = 0.0001
+    config.learning_rate = 0.0001/4
 
     config.processes = 8 if policy in ['a2c', 'ppo'] else 1
     config.epsilon_decay = 'None'
@@ -73,7 +73,7 @@ def train(policy, is_train, device='cuda', param_file=None):
         actor_optim = optim.Adam(actor.parameters(), lr=config.learning_rate, weight_decay=0.001)
         critic_optim = optim.Adam(critic.parameters(), lr=config.learning_rate, weight_decay=0.001)
 
-        kwargs = dict(eps=3, action_range=(-11, 11))
+        kwargs = dict(eps=1.5, action_range=(-12, 12))
         if 'td3' == policy:
             kwargs.update(dict(policy_noise=0.1, noise_clip=0.25, policy_freq=2))
         my_policy = local_policy(actor, critic, actor_optim, critic_optim, config.gamma, **kwargs)
@@ -89,7 +89,7 @@ def train(policy, is_train, device='cuda', param_file=None):
         if param_file and os.path.isfile(param_file):
             my_dqn.load_param(param_file)
 
-        my_dqn.train(num_frames=200000)
+        my_dqn.train(num_frames=100000)
     else:
         if param_file and os.path.isfile(param_file):
             my_dqn.load_param(param_file)

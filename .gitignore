@@ -1,4 +1,5 @@
 test/logs
+test/shark
 test/params/
 
 # Byte-compiled / optimized / DLL files

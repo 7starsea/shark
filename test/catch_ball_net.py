@@ -107,7 +107,7 @@ class Actor(nn.Module):
         x = x.view(x.size(0), -1)
 
         x = self.advantage(x)
-        return x * 20.0
+        return x * 10.0
 
 
 class Critic(nn.Module):

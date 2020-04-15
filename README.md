@@ -2,7 +2,7 @@
 
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-Shark is inspired by several rl-platform https://github.com/thu-ml/tianshou and https://github.com/astooke/rlpyt and https://github.com/openai/baselines/ and many independent rl-algorithm implementations in github.
+Shark is inspired by several rl-platform https://github.com/thu-ml/tianshou and https://github.com/astooke/rlpyt and https://github.com/openai/baselines/ and many independent rl-algorithm implementations (e.g. https://github.com/fanchenyou/RL-study/) in github.
 
 ## Implemented Algorithms
 **Replay Buffers** supporting DQN, uniform replay, prioritized experience replay
@@ -16,7 +16,7 @@ Shark is inspired by several rl-platform https://github.com/thu-ml/tianshou and 
 * Provide a CatchBall env, see shark/example/env
 
 
-## Requirement
+## Requirements
 * python3, (tested on 3.6, 3.7)
 * pytorch 1.2
 * gym 0.15.0
@@ -28,21 +28,21 @@ Shark is inspired by several rl-platform https://github.com/thu-ml/tianshou and 
 (we use ananconda enviroment for testing)
 
 ## Compile [tested on ubuntu]
-on linux
-`
-git clone https://github.com/7starsea/shark.git
+on linux, clone a copy by `git clone https://github.com/7starsea/shark.git`, and install with
+```bash
 cd shark
 python setup.py install
-`
+```
+you can also install a local copy (mainly for building cpp) using `./compile.sh`.
 
 ## test
-`
+```bash
 cd test
-mkdir -p logs params  ## 
+mkdir -p logs params  ## for local install, add a symbolic link: ln -s ../shark shark
 python test_catchball -p dqn
 python test_atari.py -p a2c
-`
+```
 
 ## Contributing
-Shark is still in infancy, we welcome contributions from everywhere to help make Shark better.
+Shark is still in infancy, we welcome contributions from everywhere to make Shark better.
  

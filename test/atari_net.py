@@ -86,13 +86,33 @@ class Actor(nn.Module):
         self.l2 = nn.Linear(100, 30)
         self.l3 = nn.Linear(30, action_dim)
 
-        self.max_action = max_action
+        self._max_action = max_action
 
     def forward(self, x):
         x = F.relu(self.l1(x))
         x = F.relu(self.l2(x))
-        x = self.max_action * torch.tanh(self.l3(x))
+        x = self._max_action * torch.tanh(self.l3(x))
         return x
+
+
+class ActorProb(nn.Module):
+    def __init__(self, state_dim, action_dim, max_action, log_std_min=-20, log_std_max=2):
+        super(ActorProb, self).__init__()
+
+        self.l1 = nn.Linear(state_dim, 100)
+        self.l2 = nn.Linear(100, 30)
+        self.mu = nn.Linear(30, action_dim)
+        self.sigma = nn.Linear(30, action_dim)
+
+        self._max_action = max_action
+        self._log_std_min, self._log_std_max = log_std_min, log_std_max
+
+    def forward(self, x):
+        x = F.relu(self.l1(x))
+        x = F.relu(self.l2(x))
+        mu = self._max_action * torch.tanh(self.mu(x))
+        sigma = torch.exp(torch.clamp(self.sigma(x), self._log_std_min, self._log_std_max))
+        return mu, sigma
 
 
 class Critic(nn.Module):

@@ -15,13 +15,13 @@ class DDPGPolicy(BaseDPGPolicy):
         obs, act, reward, next_obs, done = batch.apply(torch.cat)
 
         with torch.no_grad():
-            next_act = self.target_actor(next_obs).detach()
-            q_next_value = self.target_critic(next_obs, next_act)
+            next_act = self._target_actor(next_obs).detach()
+            q_next_value = self._target_critic(next_obs, next_act)
 
         # Compute the expected Q values
         q_next_value = reward + q_next_value * (1 - done) * self.gamma
 
-        q_value = self.critic(obs, act)
+        q_value = self._critic(obs, act)
         td_error = torch.abs(q_value.detach() - q_next_value)
         critic_loss = F.mse_loss(q_value, q_next_value)
 
@@ -31,7 +31,7 @@ class DDPGPolicy(BaseDPGPolicy):
         self.critic_optim.step()
 
         # Update the actor network
-        actor_loss = -self.critic(obs, self.actor(obs))
+        actor_loss = -self._critic(obs, self.actor(obs))
         actor_loss = actor_loss.mean()
         self.actor_optim.zero_grad()
         actor_loss.backward()

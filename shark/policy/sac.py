@@ -4,68 +4,84 @@
 import numpy as np
 from copy import deepcopy
 import torch
-import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
 from .base_dpg import BaseDPGPolicy, DPGDualCriticModel
 
 
 class SACPolicy(BaseDPGPolicy):
     def __init__(self, actor, critic, actor_optim, critic_optim, gamma, tau=0.005,
-                 eps=0.1, action_range=None,
-                 init_temperature=0.2, noise_clip=0.5, policy_freq=2
+                 eps=0.1, action_range=None, policy_freq=2,
+                 alpha=0.2, dist_fn=torch.distributions.Normal,
+                 automatic_entropy_tuning=True
                  ):
-        super().__init__('TD3', actor, critic, actor_optim, critic_optim, gamma, tau=tau,
+        super().__init__('SAC', actor, critic, actor_optim, critic_optim, gamma, tau=tau,
                          eps=eps, action_range=action_range)
 
         assert isinstance(critic, DPGDualCriticModel) and "We should use DPGDualCriticModel, see policy/base_dpg.py!"
 
-        self.log_alpha = torch.tensor(np.log(init_temperature)).to(self.device)
-        self.log_alpha.requires_grad = True
+        self._alpha = alpha
+        self.automatic_entropy_tuning = automatic_entropy_tuning
 
-        self._policy_noise = policy_noise
-        self._noise_clip = noise_clip
-        self._policy_freq = policy_freq
+        if self.automatic_entropy_tuning:
+            device = next(actor.parameters()).device
+
+            self.target_entropy = -torch.prod(torch.Tensor(1).to(device=device)).item()
+            self._log_alpha = torch.zeros(1, requires_grad=True, device=device)
+            self.alpha_optim = optim.Adam([self._log_alpha], lr=actor_optim.defaults['lr'])
+
         self._count = 0
+        self._policy_freq = policy_freq
+        self._dist_fn = dist_fn
 
     def actor(self, s):
         with torch.no_grad():
-            mu, std = self.actor(s)
+            mu_std = self._actor(s)
 
+            assert isinstance(mu_std, tuple)
+            dist = self._dist_fn(*mu_std)
 
-        action = dist.sample() if sample else dist.mean
-        action = action.clamp(*self.action_range)
+            y = torch.tanh(dist.rsample())
 
-        if self._eps > 0:
-            action += torch.randn(size=action.shape, device=action.device) * self._eps
-        action = action.clamp(self._range[0], self._range[1])
+            l, h = self._range
+            action = (h - l) * (y + 1) / 2 + l
+
+            # action = action.clamp(*self.action_range)
         return action
+
+    def _evaluate(self, s):
+        mu_std = self._actor(s)
+
+        assert isinstance(mu_std, tuple)
+        dist = self._dist_fn(*mu_std)
+
+        z = dist.sample()
+        y = torch.tanh(z)
+
+        l, h = self._range
+        action = (h - l) * (y + 1) / 2 + l
+
+        # action = action.clamp(*self.action_range)
+
+        log_prob = dist.log_prob(z) - torch.log(1 - y.pow(2) + self._eps)
+        log_prob = log_prob.sum(-1)
+        return action, log_prob
 
     def learn(self, batch, **kwargs):
         obs, act, reward, next_obs, done = batch.apply(torch.cat)
 
-#        obs = torch.cat(batch.obs)
-#        act = torch.cat(batch.act)
-#        reward = torch.cat(batch.reward)
-#        next_obs = torch.cat(batch.next_obs)
-#        done = torch.cat(batch.done)
-
         # Compute the expected Q values (label)
         with torch.no_grad():
-            next_a = self.target_actor(next_obs).detach()
+            next_a, log_prob = self._evaluate(next_obs)
 
-            noise = torch.randn(size=next_a.shape, device=next_a.device) * self._policy_noise
-            if self._noise_clip >= 0:
-                noise = noise.clamp(-self._noise_clip, self._noise_clip)
-            next_a += noise
-            next_a = next_a.clamp(self._range[0], self._range[1])
-
-            q1, q2 = self.target_critic(next_obs, next_a)
+            q1, q2 = self._target_critic(next_obs, next_a)
             q_next_value = torch.min(q1, q2).detach()
+            q_next_value = q_next_value - self._alpha * log_prob
+            q_next_value = reward + q_next_value * (1 - done) * self.gamma
 
-        q_next_value = reward + q_next_value * (1 - done) * self.gamma
 
         # Update the critic network
-        q1, q2 = self.critic(obs, act)
+        q1, q2 = self._critic(obs, act)
         td_error = torch.abs(q1.detach() - q_next_value) + torch.abs(q2.detach() - q_next_value)
 
         critic_loss = F.mse_loss(q1, q_next_value) + F.mse_loss(q2, q_next_value)
@@ -73,15 +89,25 @@ class SACPolicy(BaseDPGPolicy):
         critic_loss.backward()
         self.critic_optim.step()
 
-        if 0 == self._count % self._policy_freq:
-            # Update the actor network
-            actor_loss = -self.critic.q1(obs, self.actor(obs))
-            actor_loss = actor_loss.mean()
-            self.actor_optim.zero_grad()
-            actor_loss.backward()
-            self.actor_optim.step()
+        a, log_prob = self._evaluate(obs)
+        q1a, q2a = self._critic(obs, a)
+        actor_loss = self._alpha * log_prob - torch.min(q1a, q2a)
+        actor_loss = actor_loss.mean()
+        self.actor_optim.zero_grad()
+        actor_loss.backward()
+        self.actor_optim.step()
 
-            self.soft_update()
+        if self.automatic_entropy_tuning:
+            alpha_loss = -(self._log_alpha * (log_prob + self.target_entropy).detach()).mean()
+
+            self.alpha_optim.zero_grad()
+            alpha_loss.backward()
+            self.alpha_optim.step()
+
+            self._alpha = self._log_alpha.exp()
 
         self._count += 1
+        if 0 == self._count % self._policy_freq:
+            self.soft_update()
+
         return critic_loss.item(), td_error

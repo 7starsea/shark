@@ -7,68 +7,6 @@ import torch.nn.functional as F
 from .base_dpg import BaseDPGPolicy, DPGDualCriticModel
 
 
-# def TD3DualCriticFactory(name, critic_model):
-#     def __init__(self, *args, **kwargs):
-#         super().__init__()
-#         self.critic = critic_model(*args, **kwargs)
-#         self.critic2 = critic_model(*args, **kwargs)
-#
-#     def forward(self, *args, **kwargs):
-#         return self.critic(*args, **kwargs), self.critic2(*args, **kwargs)
-#
-#     def q1(self, *args, **kwargs):
-#         return self.critic(*args, **kwargs)
-#
-#     new_class = type(name, (nn.Module,), {"__init__": __init__, 'forward': forward, 'q1': q1})
-#     return new_class
-
-
-# class TD3DualCriticWrap(object):
-#     def __init__(self, critic):
-#         self.critic = critic
-#         self.critic2 = deepcopy(critic)
-#
-#     def __call__(self, *args, **kwargs):
-#         return self.critic(*args, **kwargs), self.critic2(*args, **kwargs)
-#
-#     def forward(self, *args, **kwargs):
-#         return self.critic(*args, **kwargs), self.critic2(*args, **kwargs)
-#
-#     def eval(self):
-#         self.critic.eval(), self.critic2.eval()
-#
-#     def train(self):
-#         self.critic.train(), self.critic2.train()
-#
-#     def q1(self, *args, **kwargs):
-#         return self.critic(*args, **kwargs)
-#
-#     def parameters(self):
-#         return list(self.critic.parameters()) + list(self.critic2.parameters())
-#
-#     def __deepcopy__(self, memo={}):
-#         cls = self.__class__
-#         result = cls.__new__(cls)
-#         memo[id(self)] = result
-#
-#         for k, v in self.__dict__.items():
-#             setattr(result, k, deepcopy(v, memo))
-#         return result
-
-
-# class TD3DualCriticModel(nn.Module):
-#     def __init__(self, critic_model, *args, **kwargs):
-#         super(TD3DualCriticModel, self).__init__()
-#         self.critic = critic_model(*args, **kwargs)
-#         self.critic2 = critic_model(*args, **kwargs)
-#
-#     def forward(self, *args, **kwargs):
-#         return self.critic(*args, **kwargs), self.critic2(*args, **kwargs)
-#
-#     def q1(self, *args, **kwargs):
-#         return self.critic(*args, **kwargs)
-
-
 class TD3Policy(BaseDPGPolicy):
     def __init__(self, actor, critic, actor_optim, critic_optim, gamma, tau=0.005,
                  eps=0.1, action_range=None,
@@ -86,15 +24,9 @@ class TD3Policy(BaseDPGPolicy):
     def learn(self, batch, **kwargs):
         obs, act, reward, next_obs, done = batch.apply(torch.cat)
 
-#        obs = torch.cat(batch.obs)
-#        act = torch.cat(batch.act)
-#        reward = torch.cat(batch.reward)
-#        next_obs = torch.cat(batch.next_obs)
-#        done = torch.cat(batch.done)
-
         # Compute the expected Q values (label)
         with torch.no_grad():
-            next_a = self.target_actor(next_obs).detach()
+            next_a = self._target_actor(next_obs).detach()
 
             noise = torch.randn(size=next_a.shape, device=next_a.device) * self._policy_noise
             if self._noise_clip >= 0:
@@ -102,13 +34,13 @@ class TD3Policy(BaseDPGPolicy):
             next_a += noise
             next_a = next_a.clamp(self._range[0], self._range[1])
 
-            q1, q2 = self.target_critic(next_obs, next_a)
+            q1, q2 = self._target_critic(next_obs, next_a)
             q_next_value = torch.min(q1, q2).detach()
 
         q_next_value = reward + q_next_value * (1 - done) * self.gamma
 
         # Update the critic network
-        q1, q2 = self.critic(obs, act)
+        q1, q2 = self._critic(obs, act)
         td_error = torch.abs(q1.detach() - q_next_value) + torch.abs(q2.detach() - q_next_value)
 
         weights = kwargs.get('weights', None)
@@ -123,7 +55,7 @@ class TD3Policy(BaseDPGPolicy):
 
         if 0 == self._count % self._policy_freq:
             # Update the actor network
-            actor_loss = -self.critic.q1(obs, self.actor(obs))
+            actor_loss = -self._critic.q1(obs, self.actor(obs))
             actor_loss = actor_loss.mean()
             self.actor_optim.zero_grad()
             actor_loss.backward()
