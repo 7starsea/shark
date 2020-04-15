@@ -29,16 +29,21 @@ Shark is inspired by several rl-platform https://github.com/thu-ml/tianshou and 
 (we use ananconda enviroment for testing)
 
 ## Compile [tested on ubuntu]
-on linux
+clone the repo by `git clone https://github.com/7starsea/shark.git`, and on linux, standary python install is like:
 `
-git clone https://github.com/7starsea/shark.git
 cd shark
 python setup.py install
+`
+if your python env already satisfy requirements, you could just do local build:
+`
+cd shark 
+./compile.sh
 `
 
 ## test
 `
 cd test
+ # # Note for local build, you should copy these *py files to parent directory and run.
 mkdir -p logs params  ## 
 python test_catchball -p dqn
 python test_atari.py -p a2c
