@@ -1,5 +1,4 @@
 # Shark - Reinforcement Learning (rl) Project with Pytorch
-===============================================
 
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
