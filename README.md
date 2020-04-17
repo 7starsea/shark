@@ -9,11 +9,11 @@ Shark is inspired by several rl-platform https://github.com/thu-ml/tianshou and 
 
 **Policy Gradient** A2C, PPO.
 
-**Q-Function Policy Gradient** DDPG, TD3, SAC(todo).
+**Q-Function Policy Gradient** DDPG, TD3, SAC.
 
 ## Features
 * Provide a fast (cpp-version) implementation of prioritized experience replay buffer. (see also https://github.com/7starsea/Prioritized-Experience-Replay)
-* Provide a CatchBall env, see shark/example/env
+* Provide envs: CatchBall and Game2048, see shark/example/env
 
 
 ## Requirements
@@ -38,8 +38,9 @@ you can also install a local copy (mainly for building cpp) using `./compile.sh`
 ## test
 ```bash
 cd test
-mkdir -p logs params  ## for local install, add a symbolic link: ln -s ../shark shark
+mkdir -p logs params  ## for local install, also need to add a symbolic link: ln -s ../shark shark
 python test_catchball -p dqn
+python test_catchball -p td3
 python test_atari.py -p a2c
 ```
 
