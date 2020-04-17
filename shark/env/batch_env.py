@@ -24,11 +24,3 @@ class BatchDeviceWrapper(Wrapper):
         ob = ob.to(device=self.device)
         return ob.unsqueeze(0)
 
-    # def render(self, *args, **kwargs):
-    #     self.env.render(*args, **kwargs)
-    #
-    # def seed(self, *args, **kwargs):
-    #     self.env.seed(*args, **kwargs)
-    #
-    # def close(self, *args, **kwargs):
-    #     self.env.close(*args, **kwargs)

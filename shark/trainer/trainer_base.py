@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 
 from torch.utils.tensorboard import SummaryWriter
 from shark.replay import ReplayBufferBase, SimpleReplayBuffer
-from .epsilon_policy import fetch_epsilon_decay
 
 
 class RLConfig(object):
@@ -20,7 +19,7 @@ class RLConfig(object):
         self.buffer_kwargs = dict()
 
         self.double_q = True
-        self.epsilon_decay = 'LinearFixed'  # Supports: Linear, Exp, LinearExp, LinearFixed, None
+        self.exploration = None
 
         self.processes = 6
         self.forward_step = 10

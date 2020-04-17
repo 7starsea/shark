@@ -53,10 +53,8 @@ class TorchStateWrapper(gym.ObservationWrapper):
 
 def get_env_fun(env_id):
     my_env = gym.make(env_id)
-    from gym.wrappers import AtariPreprocessing
-    my_env = AtariPreprocessing(my_env, screen_size=84, grayscale_obs=True, scale_obs=False, frame_skip=4, noop_max=8)
-    my_stack_env = FrameStack(my_env, 4)
-    return my_stack_env
+    print(my_env.observation_space, my_env.action_space.low, my_env.action_space.high, my_env.action_space.shape)
+    return TorchStateWrapper(my_env)
 
 
 def get_network(env, device, policy, is_continuous=False, is_dual_critic=False):
@@ -93,9 +91,8 @@ def train(policy, is_train, device='cuda', param_file=None):
 
     device = torch.device(device)
 
-    env_id = "SeaquestNoFrameskip-v4"
-    # env_id = "SpaceInvadersNoFrameskip-v4"
-
+    env_id = 'Pendulum-v0'
+    # env_id = 'MountainCarContinuous-v0'
     env_fun = lambda: get_env_fun(env_id)
     my_test_env = BatchDeviceWrapper(env_fun(), device=device)
 

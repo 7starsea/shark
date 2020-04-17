@@ -44,7 +44,7 @@ class A2CPolicy(BasePGPolicy):
         self.w_ent = ent_coef
         self.max_grad_norm = max_grad_norm
 
-    def actor(self, s):
+    def actor(self, s, noise=None):
         prob = self.policy_net.pi(s, softmax_dim=1)
         a = self.dist_fn(prob).sample()
         return a

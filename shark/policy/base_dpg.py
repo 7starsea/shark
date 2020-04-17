@@ -25,7 +25,7 @@ class DPGDualCriticModel(nn.Module):
 
 class BaseDPGPolicy(BasePolicy):
     def __init__(self, name, actor, critic, actor_optim, critic_optim, gamma, tau,
-                 eps=0.1, action_range=None):
+                 action_range=None):
         super().__init__(name, nn.ModuleDict({'actor': actor, 'critic': critic}))
         self._actor = actor
         self._critic = critic
@@ -42,15 +42,13 @@ class BaseDPGPolicy(BasePolicy):
         self.gamma = gamma
         self._tau = tau
 
-        assert eps >= 0 and "noise eps should not be negative"
-        self._eps = eps
-
         assert action_range is not None
         self._range = action_range
 
-    def set_eps(self, eps):
-        assert eps >= 0 and "noise eps should not be negative"
-        self._eps = eps
+        x_tensor = next(actor.parameters())
+        sub_kwargs = dict(dtype=x_tensor.dtype, device=x_tensor.device)
+        self._action_bias = torch.tensor((action_range[1] + action_range[0]) / 2).to(**sub_kwargs)
+        self._action_scale = torch.tensor((action_range[1] - action_range[0]) / 2).to(**sub_kwargs)
 
     def soft_update(self):
         for o, n in zip(self._target_actor.parameters(), self._actor.parameters()):
@@ -73,12 +71,14 @@ class BaseDPGPolicy(BasePolicy):
         for o, n in zip(self._target_critic.parameters(), self._critic.parameters()):
             n.data.copy_(o.data)
 
-    def actor(self, s):
+    def actor(self, s, noise=None):
         with torch.no_grad():
             action = self._actor(s)
-        if self._eps > 0:
-            action += torch.randn(size=action.shape, device=action.device) * self._eps
-        action = action.clamp(self._range[0], self._range[1])
+            action = action * self._action_scale + self._action_bias
+
+            if torch.is_tensor(noise):
+                action += noise
+                action = action.clamp(self._range[0], self._range[1])
         return action
 
     def collect(self, s_final, s_lst, a_lst, r_lst, done_lst):

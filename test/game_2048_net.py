@@ -8,9 +8,9 @@ import torch.nn.functional as F
 class SharedDiscreteNet(nn.Module):
     def __init__(self, in_channel, h, w, num_action):
         super(SharedDiscreteNet, self).__init__()
-        self.conv1 = nn.Conv2d(in_channel, 16, kernel_size=5, stride=2, padding=2)
+        self.conv1 = nn.Conv2d(in_channel, 16, kernel_size=2, stride=2, padding=2)
         self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 16, kernel_size=5, stride=2, padding=2)
+        self.conv2 = nn.Conv2d(16, 16, kernel_size=2, stride=2, padding=2)
         self.bn2 = nn.BatchNorm2d(16)
 
         # self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
@@ -18,7 +18,7 @@ class SharedDiscreteNet(nn.Module):
 
         # Number of Linear input connections depends on output of conv2d layers
         # and therefore the input image size, so compute it.
-        def conv2d_size_out(size, kernel_size=5, stride=2):
+        def conv2d_size_out(size, kernel_size=2, stride=2):
             return int((size + 2 * 2 - (kernel_size - 1) - 1) / stride + 1)
 
         convw = (conv2d_size_out(conv2d_size_out(w)))
@@ -46,6 +46,7 @@ class SharedDiscreteNet(nn.Module):
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
+        x = x.to(dtype=torch.float32)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
@@ -55,6 +56,7 @@ class SharedDiscreteNet(nn.Module):
         return value + advantage - advantage.mean(1, keepdim=True)
 
     def pi(self, x, softmax_dim=1):
+        x = x.to(dtype=torch.float32)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
@@ -64,6 +66,7 @@ class SharedDiscreteNet(nn.Module):
         return prob
 
     def v(self, x):
+        x = x.to(dtype=torch.float32)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
@@ -75,9 +78,9 @@ class SharedDiscreteNet(nn.Module):
 class Actor(nn.Module):
     def __init__(self, in_channel, h, w, num_action):
         super(Actor, self).__init__()
-        self.conv1 = nn.Conv2d(in_channel, 16, kernel_size=5, stride=2, padding=2)
+        self.conv1 = nn.Conv2d(in_channel, 16, kernel_size=2, stride=2, padding=2)
         self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 16, kernel_size=5, stride=2, padding=2)
+        self.conv2 = nn.Conv2d(16, 16, kernel_size=2, stride=2, padding=2)
         self.bn2 = nn.BatchNorm2d(16)
 
         # self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
@@ -85,7 +88,7 @@ class Actor(nn.Module):
 
         # Number of Linear input connections depends on output of conv2d layers
         # and therefore the input image size, so compute it.
-        def conv2d_size_out(size, kernel_size=5, stride=2):
+        def conv2d_size_out(size, kernel_size=2, stride=2):
             return int((size + 2 * 2 - (kernel_size - 1) - 1) / stride + 1)
 
         convw = (conv2d_size_out(conv2d_size_out(w)))
@@ -113,9 +116,9 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, in_channel, h, w, num_action):
         super(Critic, self).__init__()
-        self.conv1 = nn.Conv2d(in_channel, 16, kernel_size=5, stride=2, padding=2)
+        self.conv1 = nn.Conv2d(in_channel, 16, kernel_size=2, stride=2, padding=2)
         self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 16, kernel_size=5, stride=2, padding=2)
+        self.conv2 = nn.Conv2d(16, 16, kernel_size=2, stride=2, padding=2)
         self.bn2 = nn.BatchNorm2d(16)
 
         # self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)

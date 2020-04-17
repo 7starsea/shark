@@ -16,37 +16,56 @@ from shark.policy.td3 import TD3Policy, DPGDualCriticModel
 from shark.trainer.trainer import Trainer, RLConfig
 
 from shark.replay import SimpleReplayBuffer, PrioritizedReplayBuffer
-from shark.example.env.catch_ball_env import CatchBallEnv
+from shark.example.env.game_2048 import Game2048Env
 
-from catch_ball_net import SharedDiscreteNet, Actor, Critic
+from game_2048_net import SharedDiscreteNet, Actor, Critic
 
 
-def get_network(env, device, is_continuous=False, is_dual_critic=False):
-    if is_continuous:
-        actor = Actor(*env.observation_space.shape, env.action_space.n)
-        if is_dual_critic:
-            critic = DPGDualCriticModel(Critic, *env.observation_space.shape, env.action_space.n)
-        else:
-            critic = Critic(*env.observation_space.shape, env.action_space.n)
-        return actor.to(device), critic.to(device)
-    else:
-        model = SharedDiscreteNet(*env.observation_space.shape, env.action_space.n)
-        return model.to(device)
+def get_network(env, device):
+    model = SharedDiscreteNet(*env.observation_space.shape, env.action_space.n)
+    return model.to(device)
 
 
 def train(policy, is_train, device='cuda', param_file=None):
+    # env = Game2048Env()
+    # total_score = []
+    # for i in range(10):
+    #     import random
+    #     env.reset()
+    #     # env.render()
+    #     valid_actions = [0, 1, 2, 3]
+    #     epsi_reward = 0
+    #     while True:
+    #         act = random.choice(valid_actions)
+    #
+    #         # print("action %d" % act, valid_actions)
+    #         _, reward, done, info = env.step(act)
+    #         epsi_reward += reward
+    #         valid_actions = info['valid_actions']
+    #         # env.render()
+    #         # print()
+    #         if done:
+    #             break
+    #
+    #     total_score.append(epsi_reward)
+    #     print(i, epsi_reward)
+    # print('mean:', np.mean(total_score))
+    # exit(0)
+
     is_continuous = policy in ['ddpg', 'td3', 'sac']
+    assert not is_continuous and "Game 2048 only support discrete action policy algorithms."
+
     policy_name = policy.upper() + 'Policy'
     assert policy_name in globals() and "Failed to find policy_name"
     local_policy = globals()[policy_name]
 
     device = torch.device(device)
-    env_fun = lambda: CatchBallEnv(num_balls=10, action_penalty=0.005, waiting=0, is_continuous=is_continuous)
+    env_fun = Game2048Env
     my_test_env = BatchDeviceWrapper(env_fun(), device=device)
 
-    config = RLConfig(batch_size=256)
-    config.gamma = .99
-    config.capacity = 40000
+    config = RLConfig(batch_size=512)
+    config.gamma = .9
+    config.capacity = 100000
     config.buffer = PrioritizedReplayBuffer
     config.updates = 100
     config.learning_rate = 0.0001/4
@@ -66,22 +85,10 @@ def train(policy, is_train, device='cuda', param_file=None):
         my_train_env = ParallelEnv(env_fun, processes=config.processes, device=device)
         my_train_env.seed(10)
 
-    if is_continuous:
-        is_dual_critic = policy in ['td3', 'sac']
-        actor, critic = get_network(my_test_env, device, is_continuous=True, is_dual_critic=is_dual_critic)
-        
-        actor_optim = optim.Adam(actor.parameters(), lr=config.learning_rate, weight_decay=0.001)
-        critic_optim = optim.Adam(critic.parameters(), lr=config.learning_rate, weight_decay=0.001)
+    policy_net = get_network(my_test_env, device)
+    optimizer = optim.Adam(policy_net.parameters(), lr=config.learning_rate, weight_decay=0.001)
 
-        kwargs = dict(eps=1.5, action_range=(-12, 12))
-        if 'td3' == policy:
-            kwargs.update(dict(policy_noise=0.1, noise_clip=0.25, policy_freq=2))
-        my_policy = local_policy(actor, critic, actor_optim, critic_optim, config.gamma, **kwargs)
-    else:
-        policy_net = get_network(my_test_env, device)
-        optimizer = optim.Adam(policy_net.parameters(), lr=config.learning_rate, weight_decay=0.001)
-
-        my_policy = local_policy(policy_net, optimizer, config.gamma)
+    my_policy = local_policy(policy_net, optimizer, config.gamma)
 
     print('Processes %d EpsilonDecay %s Policy %s' % (config.processes, config.epsilon_decay, policy))
     my_dqn = Trainer(config, my_train_env, my_test_env, my_policy, device)
@@ -89,7 +96,7 @@ def train(policy, is_train, device='cuda', param_file=None):
         if param_file and os.path.isfile(param_file):
             my_dqn.load_param(param_file)
 
-        my_dqn.train(num_frames=100000)
+        my_dqn.train(num_frames=800000)
     else:
         if param_file and os.path.isfile(param_file):
             my_dqn.load_param(param_file)
@@ -99,7 +106,7 @@ def train(policy, is_train, device='cuda', param_file=None):
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='CatchBall train/simulate')
+    parser = argparse.ArgumentParser(description='Game_2048 train/simulate')
     parser.add_argument("-t", "--train",  dest="is_train", action='store_true', help="training mode", default=True)
     parser.add_argument("-s", "--simulate", dest="is_train", action='store_false', help="simulation mode")
     parser.add_argument('-p', "--policy", choices=['dqn', 'a2c', 'ppo', 'ddpg', 'td3', 'sac'], default='td3')

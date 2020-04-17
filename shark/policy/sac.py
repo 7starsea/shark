@@ -11,12 +11,12 @@ from .base_dpg import BaseDPGPolicy, DPGDualCriticModel
 
 class SACPolicy(BaseDPGPolicy):
     def __init__(self, actor, critic, actor_optim, critic_optim, gamma, tau=0.005,
-                 eps=0.1, action_range=None, policy_freq=2,
+                 action_range=None, policy_freq=2,
                  alpha=0.2, dist_fn=torch.distributions.Normal,
                  automatic_entropy_tuning=True
                  ):
         super().__init__('SAC', actor, critic, actor_optim, critic_optim, gamma, tau=tau,
-                         eps=eps, action_range=action_range)
+                         action_range=action_range)
 
         assert isinstance(critic, DPGDualCriticModel) and "We should use DPGDualCriticModel, see policy/base_dpg.py!"
 
@@ -34,7 +34,7 @@ class SACPolicy(BaseDPGPolicy):
         self._policy_freq = policy_freq
         self._dist_fn = dist_fn
 
-    def actor(self, s):
+    def actor(self, s, noise=None):
         with torch.no_grad():
             mu_std = self._actor(s)
 
@@ -43,8 +43,7 @@ class SACPolicy(BaseDPGPolicy):
 
             y = torch.tanh(dist.rsample())
 
-            l, h = self._range
-            action = (h - l) * (y + 1) / 2 + l
+            action = y * self._action_scale + self._action_bias
 
             # action = action.clamp(*self.action_range)
         return action
@@ -57,9 +56,7 @@ class SACPolicy(BaseDPGPolicy):
 
         z = dist.sample()
         y = torch.tanh(z)
-
-        l, h = self._range
-        action = (h - l) * (y + 1) / 2 + l
+        action = y * self._action_scale + self._action_bias
 
         # action = action.clamp(*self.action_range)
 

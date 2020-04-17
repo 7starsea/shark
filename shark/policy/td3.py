@@ -9,11 +9,10 @@ from .base_dpg import BaseDPGPolicy, DPGDualCriticModel
 
 class TD3Policy(BaseDPGPolicy):
     def __init__(self, actor, critic, actor_optim, critic_optim, gamma, tau=0.005,
-                 eps=0.1, action_range=None,
-                 policy_noise=0.2, noise_clip=0.5, policy_freq=2
+                 action_range=None, policy_noise=0.2, noise_clip=0.5, policy_freq=2
                  ):
         super().__init__('TD3', actor, critic, actor_optim, critic_optim, gamma, tau=tau,
-                         eps=eps, action_range=action_range)
+                          action_range=action_range)
 
         assert isinstance(critic, DPGDualCriticModel) and "We should use DPGDualCriticModel, see policy/base_dpg.py!"
         self._policy_noise = policy_noise
@@ -26,18 +25,18 @@ class TD3Policy(BaseDPGPolicy):
 
         # Compute the expected Q values (label)
         with torch.no_grad():
-            next_a = self._target_actor(next_obs).detach()
+            next_a = self._target_actor(next_obs)
+            next_a = next_a * self._action_scale + self._action_bias
 
-            noise = torch.randn(size=next_a.shape, device=next_a.device) * self._policy_noise
-            if self._noise_clip >= 0:
+            noise = torch.randn_like(next_a) * self._policy_noise
+            if self._noise_clip > 0:
                 noise = noise.clamp(-self._noise_clip, self._noise_clip)
             next_a += noise
             next_a = next_a.clamp(self._range[0], self._range[1])
 
             q1, q2 = self._target_critic(next_obs, next_a)
             q_next_value = torch.min(q1, q2).detach()
-
-        q_next_value = reward + q_next_value * (1 - done) * self.gamma
+            q_next_value = reward + q_next_value * (1 - done) * self.gamma
 
         # Update the critic network
         q1, q2 = self._critic(obs, act)
@@ -55,8 +54,7 @@ class TD3Policy(BaseDPGPolicy):
 
         if 0 == self._count % self._policy_freq:
             # Update the actor network
-            actor_loss = -self._critic.q1(obs, self.actor(obs))
-            actor_loss = actor_loss.mean()
+            actor_loss = -self._critic.q1(obs, self.actor(obs)).mean()
             self.actor_optim.zero_grad()
             actor_loss.backward()
             self.actor_optim.step()

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.6)
 
-project (CatchBallEnv)
+project (shark_example_env)
 
 if(WIN32)
 	if(CMAKE_CONFIGURATION_TYPES)
@@ -82,11 +82,12 @@ SET(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -fvisibility=hidden")
 ## SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fvisibility=hidden")
 
 set(source_dir ${CMAKE_CURRENT_SOURCE_DIR})
-PYTHON_ADD_MODULE(CatchBallSimulate  ${source_dir}/game_simulate.cpp 
-									 ${source_dir}/game_simulate_py.cpp)
-TARGET_LINK_LIBRARIES(CatchBallSimulate ${PYTHON_LIBRARIES}) 
+PYTHON_ADD_MODULE(SharkExampleEnv  ${source_dir}/catch_ball.cpp 
+								   ${source_dir}/2048.cpp 
+								   ${source_dir}/env_py.cpp)
+TARGET_LINK_LIBRARIES(SharkExampleEnv ${PYTHON_LIBRARIES}) 
 
-install(TARGETS CatchBallSimulate LIBRARY DESTINATION shark/example/env)
+install(TARGETS SharkExampleEnv LIBRARY DESTINATION shark/example/env)
 
 
 

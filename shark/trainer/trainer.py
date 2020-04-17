@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from collections import deque
 from shark.replay.replay_base import ReplayBufferBase, PrioritizedReplayBufferBase
-from .epsilon_policy import fetch_epsilon_decay
+from shark.exploration.exploration_base import ExplorationBase
 from .trainer_base import RLConfig, BaseTrainer
 
 
@@ -22,38 +22,34 @@ class Trainer(BaseTrainer):
         s = self.env.reset()
         config = self.config
         episode_r = torch.zeros(config.processes, device=self.device)
-        if config.epsilon_decay != 'None':
-            # if not isinstance(epsilon, np.ndarray):
-            epsilon = fetch_epsilon_decay(num_frames, eps_decay=int(num_frames/4),
-                                          decay_policy=config.epsilon_decay)
-        else:
-            epsilon = None
-
-        if hasattr(self.env.action_space, 'n'):
-            num_actions = self.env.action_space.n
-        else:
-            num_actions = 1
-
         checkpoints = int(num_frames / checkpoints) + 1
 
-        i = 0
+        # percentile = 75
+        # buffer_size = 8
+        # buffer = deque(maxlen=buffer_size)
 
-        percentile = 75
-        buffer_size = 8
-        buffer = deque(maxlen=buffer_size)
+        exploration_sub_args = ()
+        if isinstance(config.exploration, ExplorationBase):
+            if config.exploration.is_continuous():
+                a = self.policy.actor(s)
+                exploration_sub_args = a.shape, a.dtype
+            else:
+                exploration_sub_args = (s.shape[0], 1), torch.long
+
+        episode_r_index = 0
+
         desc = '%s_%s' % (self.env.spec.id, self.policy.name)
-        for step_idx in tqdm(range(1, num_frames + 1), desc=desc, ncols=120, mininterval=.4):
+        for frame_idx in tqdm(range(1, num_frames + 1), desc=desc, ncols=120, mininterval=.4):
             s_lst, a_lst, r_lst, done_lst = list(), list(), list(), list()
             next_s = s
             with torch.no_grad():
                 episode_r_mean = 0.0
                 episode_r_num = 0
                 for _ in range(config.forward_step):
-
-                    # # possible epsilon decay
-                    if isinstance(epsilon, np.ndarray) and random.random() <= epsilon[step_idx]:
-                        a = np.random.randint(low=0, high=num_actions, size=(s.shape[0], 1))
-                        a = torch.from_numpy(a).to(device=self.device, dtype=torch.long)
+                    if isinstance(config.exploration, ExplorationBase):
+                        x = frame_idx / (num_frames + 1.0)
+                        noise = config.exploration.sample(x, *exploration_sub_args, device=self.device)
+                        a = self.policy.actor(s, noise=noise)
                     else:
                         a = self.policy.actor(s)
 
@@ -85,16 +81,16 @@ class Trainer(BaseTrainer):
 
                 if len(self.buffer) >= config.init_learn_size:
                     if isinstance(self.buffer, PrioritizedReplayBufferBase):
-                        beta = 0.4 + 0.6 * step_idx / num_frames
+                        beta = 0.4 + 0.6 * frame_idx / num_frames
                         batch, indices, weights, priorities = self.buffer.sample(beta=beta)
                         if isinstance(indices, np.ndarray):
                             loss, td_err = self.policy.learn(batch, weights=weights)
-                            self.logger.add_scalar('train/loss', loss, step_idx)
+                            self.logger.add_scalar('train/loss', loss, frame_idx)
                             self.buffer.update_priorities(indices, priorities, td_err.cpu().numpy())
                     else:
                         batch = self.buffer.sample()
                         loss, td_err = self.policy.learn(batch)
-                        self.logger.add_scalar('train/loss', loss, step_idx)
+                        self.logger.add_scalar('train/loss', loss, frame_idx)
 
             else:
                 batch = self.policy.collect(next_s, s_lst, a_lst, r_lst, done_lst)
@@ -110,14 +106,14 @@ class Trainer(BaseTrainer):
                 #     batch_err = tran_cls(*[torch.cat(item) for item in data])
                 #     loss, td_err = self.policy.learn(batch_err)
 
-                self.logger.add_scalar('train/loss', loss, step_idx)
+                self.logger.add_scalar('train/loss', loss, frame_idx)
 
             if episode_r_num > 0:
-                self.logger.add_scalar('train/reward', episode_r_mean / episode_r_num, i)
-                i += 1
+                self.logger.add_scalar('train/reward', episode_r_mean / episode_r_num, episode_r_index)
+                episode_r_index += 1
 
-            if 0 == step_idx % config.updates:
+            if 0 == frame_idx % config.updates:
                 self.policy.sync_target(config.updates_tau)
-            if 0 == step_idx % checkpoints:
-                self.save_param(step_idx)
+            if 0 == frame_idx % checkpoints:
+                self.save_param(frame_idx)
         self.save_param()

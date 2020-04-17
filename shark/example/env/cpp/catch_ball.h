@@ -1,40 +1,14 @@
+#ifndef SHARE_EXAMPLE_ENV_CATCH_BALL_H
+#define SHARE_EXAMPLE_ENV_CATCH_BALL_H
+
+
 
 #include <utility>
 #include <vector>
-#include <random>
 #include <tuple>
 
 #include "inc/cnarray.hpp"
-
-/* template<typename T>
- * class Rect{
- * public:
- *     Rect(T left, T top, T width, T height)
- *     : left_(left), top_(top), width_(width), height_(height)
- *     {}
- *
- *     T left() const { return left_; }
- *     T top() const { return top_; }
- *     T width() const { return width_; }
- *     T height() const { return height_; }
- *
- *     T bottom() const { return top_ - height_; }
- *     T right() const { return left_ + width_; }
- *
- *     void move2left(T x){ left_ -= x;  }
- *     void move2right(T x){ left_ += x; }
- *
- *     void move2top(T x){ top_ += x; }
- *     void move2bottom(T x){ top_ -= x; }
- *
- * private:
- *     T left_;
- *     T top_;
- *     T width_;
- *     T height_;
- * };
- */
-
+#include "crandom.h"
 
 struct Color{
     uint8_t r;
@@ -100,31 +74,25 @@ public:
   
     void reset();
     void reset_ball();
-    void seed(int);
+    void seed(int seed_id){rand_.seed(seed_id);}
 
-    std::pair<int, int> action_range(){
+    std::pair<int, int> action_range()const{
         return action_range_;
     }
     void set_action_range(const std::pair<int, int> & act_range){
         action_range_ = act_range;
     }
-    /*
-    void set_action_range(const std::tuple<int, int> & act_range){
-        action_range_.first = std::get<0>(act_range);
-        action_range_.second = std::get<1>(act_range);
-    }
-    */
-    std::pair<int, int> screen_size(){
+    std::pair<int, int> screen_size()const{
         return std::pair<int, int>( screen_size_.h,  screen_size_.w );
     }
-    std::pair<int, int> ball_size(){
+    std::pair<int, int> ball_size()const {
         return std::pair<int, int>( ball_size_.h,  ball_size_.w );
     }
-    std::pair<int, int> bar_size(){
+    std::pair<int, int> bar_size()const{
         return std::pair<int, int>( bar_size_.h,  bar_size_.w );
     }
+    bool is_continuous()const{return is_continuous_;}
 protected:
-
     
     const Size screen_size_;
     const Size ball_size_;
@@ -142,15 +110,14 @@ protected:
     const double action_penalty_;
     const bool is_continuous_;
 
-    long long int seed_;
-    std::mt19937 rng_;
-    std::uniform_int_distribution<int> u_dist_;
-
+    CRandom rand_;
 
     void _move_bar(Rect & bar, int action);
     void _move_ball(Rect & ball);
     bool _get_reward(const Rect &bar, double &reward);
-
     void _draw(const Color & c, const Rect & rect, uint8_3darray & screen);
 
 };
+
+
+#endif

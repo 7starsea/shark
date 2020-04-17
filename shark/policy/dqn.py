@@ -14,10 +14,16 @@ class DQNPolicy(BasePGPolicy):
         super().__init__('DQN', policy_net, optimizer, gamma)
         self.double_q = double_q
 
-    def actor(self, s):
+    def actor(self, s, noise=None, valid_actions=None):
+        if torch.is_tensor(noise):
+            return noise
         with torch.no_grad():
             q_value = self.policy_net.forward(s)
-            action = q_value.max(1)[1].view(-1, 1).clone()
+            if valid_actions:
+                pass
+                action = q_value.max(1)[1].view(-1, 1)
+            else:
+                action = q_value.max(1)[1].view(-1, 1)
         return action
 
     def collect(self, s_final, s_lst, a_lst, r_lst, done_lst):

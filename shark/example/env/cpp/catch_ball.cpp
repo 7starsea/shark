@@ -1,4 +1,4 @@
-#include "game_simulate.h"
+#include "catch_ball.h"
 
 #include <iostream>
 #include <ctime>
@@ -11,16 +11,13 @@ CatchBallSimulate::CatchBallSimulate(const Size & screen, const Size & ball, con
     , bar_pos_( screen_size_.w / 2 - bar_size_.w / 2, screen_size_.h, bar_size_.w, bar_size_.h )
 
     , ball_dir_x_( ball_speed.w ), ball_dir_y_( ball_speed.h )
-    , action_range_(-10, 10)
+    , action_range_(-20, 20)
     , waiting_(waiting), cur_waits_(0)
     , action_penalty_(action_penalty)
     , is_continuous_(is_continuous)
-    
-    , seed_(time(NULL)), rng_(seed_)
-    , u_dist_( 0, screen_size_.w - ball_size_.w ) 
-    {
 
-    }
+    , rand_(0, screen_size_.w - ball_size_.w, time(NULL))
+    {    }
 
 
 void CatchBallSimulate::draw(uint8_3darray & screen){
@@ -51,13 +48,6 @@ void CatchBallSimulate::_draw(const Color & c, const Rect & rect,  uint8_3darray
 }
 
 
-void CatchBallSimulate::seed(int seed_id){
-    rng_.seed(seed_id);
-    u_dist_.reset();
-    //gen_.engine().seed( seed_id );
-    //gen_.distribution().reset();
-}
-
 
 bool CatchBallSimulate::_get_reward(const Rect &bar, double & reward){
 
@@ -72,33 +62,29 @@ bool CatchBallSimulate::_get_reward(const Rect &bar, double & reward){
             }
             reward /= ball_pos_.width();
             reward = reward >= .5 ? 1.0 : 0;
-//            reward = 1;
         }
         
         return true;
     }
     return false;
-///    return reward;
 }
 
 void CatchBallSimulate::reset_ball(){
 	ball_pos_.set_top(ball_size_.h/2);
-	ball_pos_.set_left( u_dist_(rng_)  );
+	ball_pos_.set_left( rand_.sample()  );
 }
 
 
 
 void CatchBallSimulate::reset(){
 ///	rng_.seed( time(NULL) + ((++ seed_) % 100000000) );
-	
 ///	gen_.engine().seed( time(NULL)  + ((++ seed_) % 100000000) );
 ///	gen_.distribution().reset();
 	
 	reset_ball();
-    
     const double ratio =  (double(screen_size_.w - bar_size_.w)) / (screen_size_.w - ball_size_.w) ;
 
-    int l = int( u_dist_(rng_) * ratio);
+    int l = int( rand_.sample() * ratio);
     bar_pos_.set_left( l );
 
 }
@@ -108,7 +94,7 @@ void CatchBallSimulate::reset(){
 void CatchBallSimulate::_move_bar(Rect & bar, int action){
     if(is_continuous_){
         if(action > action_range_.second) action = action_range_.second;
-        else if(action < -action_range_.first) action = -action_range_.first;
+        else if(action < action_range_.first) action = action_range_.first;
     }else{
         /// in discrete setting, receive action value 0, 1, 2
         action -= 1;

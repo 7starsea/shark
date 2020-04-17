@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from gym import spaces, Env
 
-from .CatchBallSimulate import CatchBallSimulate
+from .SharkExampleEnv import CatchBallSimulate
 
 # internal_screen_h, internal_screen_w = 80, 140
 
@@ -15,8 +15,8 @@ from .CatchBallSimulate import CatchBallSimulate
 class CatchBallEnvBase(Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, screen=(80, 140), num_balls=10, action_penalty=.02, waiting=0, is_continuous=False):
-        self.game = CatchBallSimulate(screen, (6, 6), (5, 2), (5, 15),
+    def __init__(self, screen=(80, 120), num_balls=10, action_penalty=.02, waiting=0, is_continuous=False):
+        self.game = CatchBallSimulate(screen, ball=(6, 6), ball_speed=(5, 2), bar=(5, 15),
                                       action_penalty=action_penalty,
                                       waiting=waiting, is_continuous=is_continuous)
 
@@ -26,12 +26,21 @@ class CatchBallEnvBase(Env):
 
         h, w = screen
         self.observation_space = spaces.Space(shape=(h, w, 1), dtype=np.uint8)
-        self.action_space = spaces.Discrete(n=3)
+        if is_continuous:
+            low, high = self.game.action_range
+            self.action_space = spaces.Box(low=low, high=high, shape=(1,))
+        else:
+            self.action_space = spaces.Discrete(n=3)
 
         self.spec = SimpleNamespace(id='CatchBall_%d' % num_balls)
 
         self.ax = None
         self.fig = None
+
+    def set_action_range(self, low, high):
+        assert self.game.is_continuous and "Only continuous action supports set_action_range."
+        self.game.action_range = low, high
+        self.action_space = spaces.Box(low=low, high=high, shape=(1,))
 
     def seed(self, seed):
         self.game.seed(seed)
@@ -58,9 +67,6 @@ class CatchBallEnvBase(Env):
         state = np.zeros_like(self.screen)
         self.game.get_display(state)
         return state
-
-    def reset_task(self):
-        pass
 
     def step(self, action):
         # # in discrete-setting, action should be 0, 1, 2
